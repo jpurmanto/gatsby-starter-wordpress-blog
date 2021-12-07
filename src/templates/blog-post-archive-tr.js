@@ -71,7 +71,7 @@ const BlogIndex = ({
 export default BlogIndex
 
 export const pageQuery = graphql`
-  query WordPressPostArchive($offset: Int!, $postsPerPage: Int!, $language: String!) {
+  query WordPressPostArchiveTr($offset: Int!, $postsPerPage: Int!, $language: String!) {
     allWpPost(
       filter: {language: {slug: {eq: $language}}}
       sort: { fields: [date], order: DESC }

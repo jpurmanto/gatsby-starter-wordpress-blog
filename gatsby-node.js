@@ -12,57 +12,72 @@ const chunk = require(`lodash/chunk`)
  * See https://www.gatsbyjs.com/docs/node-apis/#createPages for more info.
  */
 exports.createPages = async gatsbyUtilities => {
-  // Query our posts from the GraphQL server
-  const posts = await getPosts(gatsbyUtilities)
+  // Query all languages from the GraphQL server
+  const languages = await getLanguages(gatsbyUtilities)
+  await Promise.all(
+    //for each language generate blog post pages
+    languages.map(async (langObj) => {
+    let language=langObj.slug
+    // Query our posts from the GraphQL server
+    const posts = await getPosts(language,gatsbyUtilities)
 
-  // If there are no posts in WordPress, don't do anything
-  if (!posts.length) {
-    return
-  }
-
-  // If there are posts, create pages for them
-  await createIndividualBlogPostPages({ posts, gatsbyUtilities })
-
-  // And a paginated archive
-  await createBlogPostArchive({ posts, gatsbyUtilities })
+    // If there are no posts in WordPress, don't do anything
+    if (!posts.length) {
+      return
+    }
+  
+    // If there are posts, create pages for them
+    await createIndividualBlogPostPages({ language, posts, gatsbyUtilities })
+  
+    // And a paginated archive
+    await createBlogPostArchive({ language, posts, gatsbyUtilities })
+    
+  })
+  
+  )
 }
 
 /**
  * This function creates all the individual blog pages in this site
  */
-const createIndividualBlogPostPages = async ({ posts, gatsbyUtilities }) =>
-  Promise.all(
-    posts.map(({ previous, post, next }) =>
-      // createPage is an action passed to createPages
-      // See https://www.gatsbyjs.com/docs/actions#createPage for more info
-      gatsbyUtilities.actions.createPage({
-        // Use the WordPress uri as the Gatsby page path
-        // This is a good idea so that internal links and menus work 👍
-        path: post.uri,
+const createIndividualBlogPostPages = async ({ language, posts, gatsbyUtilities }) => {
+    let template="./src/templates/blog-post.js"
+    if(language==='tr'){
+      template = "./src/templates/blog-post-tr.js"
+    }  
+    Promise.all(
+        posts.map(({ previous, post, next }) =>
+          // createPage is an action passed to createPages
+          // See https://www.gatsbyjs.com/docs/actions#createPage for more info
+          gatsbyUtilities.actions.createPage({
+            // Use the WordPress uri as the Gatsby page path
+            // This is a good idea so that internal links and menus work 👍
+            path: post.uri,
 
-        // use the blog post template as the page component
-        component: path.resolve(`./src/templates/blog-post.js`),
+            // use the blog post template as the page component
+            component: path.resolve(template),
 
-        // `context` is available in the template as a prop and
-        // as a variable in GraphQL.
-        context: {
-          // we need to add the post id here
-          // so our blog post template knows which blog post
-          // the current page is (when you open it in a browser)
-          id: post.id,
+            // `context` is available in the template as a prop and
+            // as a variable in GraphQL.
+            context: {
+              // we need to add the post id here
+              // so our blog post template knows which blog post
+              // the current page is (when you open it in a browser)
+              id: post.id,
 
-          // We also use the next and previous id's to query them and add links!
-          previousPostId: previous ? previous.id : null,
-          nextPostId: next ? next.id : null,
-        },
-      })
-    )
-  )
+              // We also use the next and previous id's to query them and add links!
+              previousPostId: previous ? previous.id : null,
+              nextPostId: next ? next.id : null,
+            },
+          })
+        )
+      )
+}
 
 /**
  * This function creates all the individual blog pages in this site
  */
-async function createBlogPostArchive({ posts, gatsbyUtilities }) {
+async function createBlogPostArchive({ language, posts, gatsbyUtilities }) {
   const graphqlResult = await gatsbyUtilities.graphql(/* GraphQL */ `
     {
       wp {
@@ -78,7 +93,7 @@ async function createBlogPostArchive({ posts, gatsbyUtilities }) {
   const postsChunkedIntoArchivePages = chunk(posts, postsPerPage)
   const totalPages = postsChunkedIntoArchivePages.length
 
-  return Promise.all(
+  await Promise.all(
     postsChunkedIntoArchivePages.map(async (_posts, index) => {
       const pageNumber = index + 1
 
@@ -88,19 +103,28 @@ async function createBlogPostArchive({ posts, gatsbyUtilities }) {
           // we want the first page to be "/" and any additional pages
           // to be numbered.
           // "/blog/2" for example
-          return page === 1 ? `/` : `/blog/${page}`
+          if(language=='tr'){
+            return page === 1 ?  `/tr/` :  `/tr/blog/${page}`
+          }else{
+            return page === 1 ?  `/` :  `/blog/${page}`
+          }
         }
 
         return null
       }
 
+      //define template based on language
+      let template="./src/templates/blog-post-archive.js"
+      if(language==='tr'){
+        template = "./src/templates/blog-post-archive-tr.js"
+      }
       // createPage is an action passed to createPages
       // See https://www.gatsbyjs.com/docs/actions#createPage for more info
       await gatsbyUtilities.actions.createPage({
         path: getPagePath(pageNumber),
 
         // use the blog post archive template as the page component
-        component: path.resolve(`./src/templates/blog-post-archive.js`),
+        component: path.resolve(template),
 
         // `context` is available in the template as a prop and
         // as a variable in GraphQL.
@@ -109,7 +133,8 @@ async function createBlogPostArchive({ posts, gatsbyUtilities }) {
           // so for page 1, 0 * 10 = 0 offset, for page 2, 1 * 10 = 10 posts offset,
           // etc
           offset: index * postsPerPage,
-
+          //tell the language to filter posts by language
+          language,
           // We need to tell the template how many posts to display too
           postsPerPage,
 
@@ -129,11 +154,13 @@ async function createBlogPostArchive({ posts, gatsbyUtilities }) {
  * We're passing in the utilities we got from createPages.
  * So see https://www.gatsbyjs.com/docs/node-apis/#createPages for more info!
  */
-async function getPosts({ graphql, reporter }) {
+ async function getPosts(language,{ graphql, reporter }) {
   const graphqlResult = await graphql(/* GraphQL */ `
     query WpPosts {
       # Query all WordPress blog posts sorted by date
-      allWpPost(sort: { fields: [date], order: DESC }) {
+      allWpPost(  
+        filter: {language: {slug: {eq: "`+language+`"}}}
+        sort: { fields: [date], order: DESC }) {
         edges {
           previous {
             id
@@ -152,6 +179,7 @@ async function getPosts({ graphql, reporter }) {
         }
       }
     }
+    
   `)
 
   if (graphqlResult.errors) {
@@ -163,4 +191,29 @@ async function getPosts({ graphql, reporter }) {
   }
 
   return graphqlResult.data.allWpPost.edges
+}
+
+
+async function getLanguages({ graphql, reporter }) {
+  const graphqlResult = await graphql(/* GraphQL */ `
+    query WpLanguages {
+      wp {
+        languages{
+          id
+          slug
+        }
+      }
+    }
+    
+  `)
+
+  if (graphqlResult.errors) {
+    reporter.panicOnBuild(
+      `There was an error loading blog languages`,
+      graphqlResult.errors
+    )
+    return
+  }
+
+  return graphqlResult.data.wp.languages
 }
