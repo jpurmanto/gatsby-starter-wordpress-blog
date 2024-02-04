@@ -1,18 +1,3 @@
-<!-- AUTO-GENERATED-CONTENT:START (STARTER) -->
-<p align="center">
-  <a href="https://www.gatsbyjs.com">
-    <img alt="Gatsby" src="https://www.gatsbyjs.com/Gatsby-Monogram.svg" width="60" />
-  </a>
-</p>
-<h1 align="center">
-  Gatsby WordPress blog starter - Multilingual page generation
-</h1>
-
-Follow the original Quickstart to setup a blog page. 👇
-
-## 🚀 Quick start
-
-To get your project started or to just try it out, you can **follow the [Gatsby Wordpress Quickstart](https://github.com/gatsbyjs/gatsby-source-wordpress-experimental/blob/master/docs/getting-started.md#quick-start)** instructions
 
 ## Generation multilingual blog archive page with seperate blog post templates
 
